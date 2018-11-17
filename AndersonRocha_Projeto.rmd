@@ -1,0 +1,438 @@
+Anderson Rocha - Análise da Produção e Consumo de Petróleo
+==========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Carregue aqui todos os pacotes utilizados 
+# na sua análise realizada neste arquivo fonte.
+
+library(knitr)
+library(ggplot2)
+library(ggrepel)
+library(gridExtra)
+library(grid)
+library(scales)
+library(tidyr)
+library(reshape2)
+library(dplyr)
+
+# Note que o parâmetro "echo" foi definido como FALSE neste código.
+# Isso previne que o código apresente resultados formatados em HTML.
+# Você deve definir echo=FALSE para todos os blocos de código no seu arquivo.
+
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Carregamento dos dados
+setwd('C:\\Users\\Anderson\\Documents\\UDACITY\\Nanodegree Data Scientist\\Projeto_EDA_R\\')
+ds_p <- read.csv('oil_production_total.csv')
+ds_c <- read.csv('oil_consumption_total.csv')
+
+#TRATAMENTO DE DADOS
+
+#TRATAMENTO DO DATASET DE PRODUÇÃO
+
+#FAZENDO A TRANSFORMAÇÃO DAS COLUNAS PARA LINHAS
+ds_t_p <- gather(ds_p,Year,Production,-country,na.rm = FALSE,convert = TRUE)
+#TRATANDO VALORES NULOS
+ds_t_p[is.na(ds_t_p)] <- 0
+#TRATANDO A COLUNA ANO, EXTRAINDO SÓ OS NÚMEROS E IGNORANDO O "X"
+ds_t_p$Year <-substr(ds_t_p$Year, 2,5)
+#VERIFICANDO O TIPO DE DADOS DA COLUNA ANO
+typeof(ds_t_p$Year)
+#CONVERTENDO PARA NUMÉRICO
+ds_t_p$Year <- as.numeric(as.character(ds_t_p$Year))
+#OS DADOS BRUTOS ESTÃO EM Tons Of Oil Equivalent (TOE)
+#OS MESMOS SERÃO CONVERTIDOS PARA Barrels Of Oil Equivalent (BBOE)
+# 1 (TOE) = 6.8412 (BBOE)
+ds_t_p$Production <- ds_t_p$Production*6.8412
+ds_t_p$Production <- round(ds_t_p$Production/1000000000,5)
+
+#TRATAMENTO DO DATASET DE CONSUMO
+
+#FAZENDO A TRANSFORMAÇÃO DAS COLUNAS PARA LINHAS
+ds_t_c <- gather(ds_c,Year,Consumption,-country,na.rm = FALSE,convert = TRUE)
+#TRATANDO VALORES NULOS
+ds_t_c[is.na(ds_t_c)] <- 0
+#TRATANDO A COLUNA ANO, EXTRAINDO SÓ OS NÚMEROS E IGNORANDO O "X"
+ds_t_c$Year <-substr(ds_t_c$Year, 2,5)
+#VERIFICANDO O TIPO DE DADOS DA COLUNA ANO
+typeof(ds_t_c$Year)
+#CONVERTENDO PARA NUMÉRICO
+ds_t_c$Year <- as.numeric(as.character(ds_t_c$Year))
+#OS DADOS BRUTOS ESTÃO EM Tons Of Oil Equivalent (TOE)
+#OS MESMOS SERÃO CONVERTIDOS PARA Barrels Of Oil Equivalent (BBOE)
+# 1 (TOE) = 6.8412 (BBOE)
+ds_t_c$Consumption <- ds_t_c$Consumption*6.8412
+ds_t_c$Consumption <- round(ds_t_c$Consumption/1000000000,5)
+
+#FAZENDO O MERGE DOS DATASET'S DE PRODUÇÃO E CONSUMO; PORÉM, NÃO EXISTEM DADOS DE CONSUMO PARA
+#TODOS OS PAÍSES / ANOS, DESSA FORMA O MERGE FOI FEITO DE MODO A DEIXAR EM BRANCO OS DADOS 
+#FALTANTES DE CONSUMO
+
+merged <- merge(ds_t_p,ds_t_c,by=c("country","Year"),all.x = TRUE)
+
+#PAISES INTEGRANTES DA OPEP
+#FONTE https://www.opec.org/opec_web/en/about_us/25.htm
+
+#CRIANDO A COLUNA OPEP DE MODO A INDENTIFICAR OS PAÍSES MEMBROS DA OPEP
+merged$Opep[merged$country %in% c("Angola","Saudi Arabia","Algeria","Ecuador","United Arab Emirates","Indonesia","Iran","Iraq","Kuwait","Libya","Nigeria","Qatar","Venezuela","Gabon","Congo Rep.")] <- 'Opep'
+
+```
+
+# Seção de Gráficos Univariados
+```{r echo=FALSE,fig.align='center', Univariate_Plots}
+#HISTOGRAMA DE PRODUÇÃO MUNDIAL
+ggplot(aes(x=Production),data = merged)+
+  geom_histogram(bins=60,fill=I('#F79420'))+
+  scale_x_continuous(limits = c(0, 4.25), breaks = seq(0, 4.25, 0.5))+
+  xlab("Produção em Bilhões de Barris de Óleo Equivalente")+
+  ylab("Ocorrências")+
+  ggtitle("Histograma da Produção Mundial")
+
+#HISTOGRAMA DE CONSUMO MUNDIAL
+ggplot(aes(x=Consumption),data = subset(merged,!is.na(merged$Consumption)))+
+  geom_histogram(bins=60,fill=I('blue'))+
+  scale_x_continuous(limits = c(0, 6.5), breaks = seq(0, 6.5, 0.5))+
+  xlab("Consumo em Bilhões de Barris de Óleo Equivalente")+
+  ylab("Ocorrências")+
+  ggtitle("Histograma do Consumo Mundial")
+```
+
+
+# Análise Univariada
+
+### Qual é a estrutura do conjunto de dados?
+
+#### Os dados foram obtidos da gapminder, subgrupos energy / oil (https://www.gapminder.org/data/).
+#### Foram utilizados 2 DATASETS, um sobre a produção de petróleo e outro sobre o consumo,
+#### esses DATASETS foram formatados para facilitar a análise dos dados de forma temporal,
+#### e posteriormente mesclados, o formato final ficou com 2548 linhas e 4 colunas, que representam:
+#### País, ano, produção e consumo, que estão expressos em BBOE (barrels of oil equivalent)
+
+#### também foi criada a coluna ‘Opep’ para identificar quais são os países que fazem parte da OPEP
+#### (organização dos países produtores de petróleo), dessa forma o DATASET final ficou com 2548 linhas e 
+#### 5 colunas
+
+### Quais são os principais atributos de interesse deste conjunto de dados?
+
+#### Os atributos mais importantes são a Produção e o Consumo
+
+### Quais outros atributos você acha que podem lhe auxiliar na investigação destes atributos de interesse?
+
+#### Os demais atributos, País e Ano, são igualmente importantes pois nos permite comparar
+#### a produção e o Consumo entre os países e também o desempenho ao longo do tempo, identificando
+#### ocorrências que influenciaram por exemplo a produção
+
+### Você criou novas variáveis a partir dos atributos existentes no conjunto de dados?
+
+#### A variáveis Produção e Consumo foram recalculadas, no DATASET original as mesmas estavam na unidade
+#### TOE (Tons Of Oil Equivalent) que não é a unidade de praxe para acompanhamento da produção e consumo
+#### de petroléo na indústria, a mesma foi recalculada para BBOE (Barrels Of Oil Equivalent)
+
+#### Também foi transformada a variável ano, onde existia uma variável para cada ano
+
+#### Foi criada a variável OPEP como descrito anteriormente
+
+### Dos atributos investigados, distribuições incomuns foram encontradas? Você aplicou operações nos dados para limpá-los, ajustá-los ou mudar a forma dos dados? Se sim, por quê?
+
+#### A distribuição é altamente enviesada, porém, isso reflete a realidade, ou seja, a grande
+#### maioria das produções anuais dos países não passa de 1 bilhão de barris, percebe-se que
+#### poucas produções anuais se concentram em 1.5 e 4.0 bilhões no ano
+
+#### Em relação ao consumo a tendência se repete, a maioria das ocorrências de consumo se concentram
+#### em países que consomem até 600 milhões BOE no ano, poucos são os grandes consumidores de Petróleo 
+#### que exploraremos mais a diante
+
+
+# Seção de Gráficos Bivariados
+```{r echo=FALSE,fig.align='center', Bivariate_Plots}
+# PRODUÇÃO X CONSUMO NO MUNDO
+ggplot(aes(x=Production,y=Consumption),data=subset(merged,!is.na(merged$Consumption)))+
+  geom_point(aes(color=country))+
+  ylab("Consumo")+
+  xlab("Produção")+
+  ggtitle("PRODUÇÃO X CONSUMO")
+
+# PRODUÇÃO X CONSUMO NO BRAZIL, DESTACANDO PONTOS DE INTERESSE
+ss <- subset(merged,merged$country == 'Brazil')
+
+ggplot(data = ss , aes(x = Production*1000, y = Consumption*1000))+
+  geom_point()+
+  annotate(geom="label_repel", x=0.07867*1000, y=0.35779*1000,label="1981",color="red",nudge_x=80, nudge_y=200)+
+  annotate(geom="label_repel", x=0.06157*1000, y=0.38721*1000,label="1979",color="red",nudge_x=20, nudge_y=200)+
+  geom_smooth()+
+  ylab("Consumo em Milhões de BOE")+
+  xlab("Produção em Milhões de BOE")+
+  ggtitle("Produção e Consumo no Brasil com pontos de interesse")
+
+# VERIFICANDO A CORRELAÇÃO ENTRE AS VARIÁVEIS PRODUÇÃO E CONSUMO
+cor.test(merged$Production,merged$Consumption, method = c("pearson"))$estimate * 100
+
+```
+
+# Análise Bivariada
+
+### Discuta sobre alguns dos relacionamentos observados nesta parte da investigação. Como os atributos de interesse variaram no conjunto de dados?
+
+#### Foram considerados os atributos Produção e Consumo na análise Bivariada, dois gráficos foram 
+#### criados e seguem as considerações sobre cada um deles:
+
+#### Gráfico (PRODUÇÃO X CONSUMO):
+
+#### Esse gráfico explorou a relação Produção x Consumo de todos os países do DATASET, existem alguns
+#### destaques nítidos: Existem 4 grandes clusteres de dados: 1) Estados Unidos, com uma
+#### elavada taxa de produção e consumo, porém é nítido que a demanda é maior que a produção,  2) Russia 
+#### e Arábia Saudita, tem produção elevada destacada, nesse caso eles produzem mais do que consomem, 3) 
+#### China, é muito visível o crescimento do consumo Chinês, porém a produção não acompanha a demanda, o 
+#### que faz da China um dos maiores importadores líquidos do mundo, 4) O maior cluster são dos países que têm
+#### equilíbrio entre consumo e produção.
+
+#### Gráfico (PRODUÇÃO E CONSUMO NO BRASIL, COM PONTOS DE DESTAQUES)
+
+#### Se não fosse a produção estagnada até o ano de 1979, seria possível afirmar que a relação Produção x 
+#### Consumo no Brasil é quase linear, ou seja, a Produção acompanhando a demanda, após o ano de 1981 a 
+#### Produção cresce sucessivamente.
+
+### Você observou algum relacionamento interessante entre os outros atributos (os que não são de interesse)?
+
+#### A produção e consumo, estão relacionados diretamente com o ano, fatores geopolíticos por exemplo, 
+#### influenciam a Produção e a Demanda, mais a frente ficará claro essa evolução através da inserção da 
+#### variável tempo (anos).
+
+### Qual foi o relacionamento mais forte encontrado?
+
+#### Prodção e Consumo, apresentam uma relação moderada de 63.44%
+
+# Seção de Gráficos Multivariados
+
+```{r echo=FALSE,fig.align='center',Multivariate_Plots}
+#CONSUMO E PRODUÇÃO DE ALGUNS PAÍSES EM ALGUNS ANOS (GRÁFICO DE BARRAS)
+c <- subset(merged,!is.na(merged$Consumption) & (merged$country %in% c('China','United States','Brazil','Saudi Arabia')) & merged$Year %in% c("2012","2013","2014","2015","2016"))
+c$Opep=NULL
+t <- melt(c, id=c("Year","country"))
+
+ggplot(t, aes(x=Year, y=value, fill=variable))+
+    geom_bar(stat='identity', position='dodge')+
+    scale_fill_manual(values = c("deepskyblue4","cadetblue"))+
+    ggtitle("Consumo x Produção - Alguns Países")+
+    ylab("Produção em bilhões de BBOE (Barris de Óleo Equivalente)")+
+    xlab("Ano")+
+    guides(fill=guide_legend(title="LEGENDA"))+
+    geom_text(aes(label=round(value,1),fontface=1),size=3,check_overlap = TRUE,position=position_dodge(width=1))+
+    facet_wrap(~ country)
+
+# COMPARATIVO DA PRODUÇÃO E CONSUMO DESTACANDO O PAÍS
+ss_merged <- subset(merged,!is.na(merged$Consumption) & merged$country %in% c('United States','Saudi Arabia','China'))
+to_plot <- summarise(group_by(ss_merged,Year,country),
+               cons_mean=mean(Consumption),
+               prod_mean=mean(Production))
+to_plot %>%
+    gather(key,value, prod_mean, cons_mean) %>%
+    ggplot(aes(x=Year, y=value, colour=key)) +
+    geom_line()+
+    ggtitle("Comparativo Consumo x Produção - Alguns Países")+
+    ylab("Prod. em bilhões de BBOE (Barris de Óleo Equivalente)")+
+    xlab("Ano")+
+    facet_wrap(~ country)
+
+#PRODUÇÃO AO LONGOS DOS ANOS, PAÍSES DA OPEP
+ggplot(data = subset(merged,merged$Opep=='Opep'),aes(x = Year, y = Production,fill=country))+
+  geom_bar(size=1.5,stat = "identity")+
+  ylab("Produção em bilhões de BBOE (Barris de Óleo Equivalente)")+
+  xlab("Ano")+
+  ggtitle("Prod. OPEP (Destaque para o Segundo Choque do Petróleo)")
+
+#PRODUÇÃO TOTAL E PRODUÇÃO MÉDIA, PAÍSES DA OPEP (BOXPLOT)
+ggplot(data=subset(merged,merged$Opep=='Opep'),aes(x=Year,y=Production,group=Year))+
+  geom_boxplot()+
+  stat_summary(fun.y = mean, geom="point",colour="red", size=1)+
+  ylab("Prod. em bilhões de BBOE (Barris de Óleo Equivalente)")+
+  xlab("Ano")+
+  ggtitle("Produção total e média - OPEP")
+
+#PRODUÇÃO TOTAL E PRODUÇÃO MÉDIA, PAÍSES DA OPEP (BARPLOT)
+ggplot(data=subset(merged,merged$Opep=='Opep'),aes(x=Year,y=Production))+
+  geom_bar(stat="identity",fill="blue")+
+  stat_summary(fun.y = mean, geom="line",colour="red", size=1)+
+  ylab("Prod. em bilhões de BBOE (Barris de Óleo Equivalente)")+
+  xlab("Ano")+
+  ggtitle("Produção total e média - OPEP")
+```
+
+# Análise Multivariada
+
+### Discuta sobre os relacionamentos observados nesta parte da investigação. Quais atributos que fortaleceram os demais na observação das variáveis de interesse?
+
+#### Com a introdução da variável tempo (Anos), fica claro como que os aspectos históricos e geopolíticos 
+#### influenciam os movimentos de produção e no consumo, destaco alguns pontos interessantes:
+
+#### 1) No gráfico "Consumo x Produção - Alguns Países", fica claro a posição consolidada de importador 
+#### líquido ou exportador líquido de alguns países, destacando o Brasil que está muito perto de ser 
+#### declarado auto-suficiente, podendo se tornar um exportador líquido.
+
+#### 2) No gráfico "Comparativo Consumo x Produção - Alguns Países", destaquei três movimentos 
+#### interessantes: O crescimento exponencial do consumo da China, o impacto do Segundo Choque do 
+#### Petróleo na Arábia Saudita (O maior produtor do mundo - OPEP) e por último o crescimento da 
+#### produção após 2010 nos Estados Unidos com a introdução da exploração dos não convencionais.
+
+#### 3) O Segundo Choque do Petróleo (Destacado nos SLIDES sobre a OPEP) mostra uma queda expressiva na 
+#### produção https://www1.folha.uol.com.br/folha/dinheiro/petroleo_choque2.shtml do países membros da 
+#### OPEP.
+
+#### Os dois últimos gráficos de produção dos países da OPEP, deixa evidente também, que apesar da alta 
+#### produção, a média é baixa, pois somente alguns países da OPEP são super produtores (Gráfico de 
+#### Barras e Gráfico de Caixas).
+
+### Interações surpreendentes e/ou interessantes foram encontradas entre os atributos?
+
+#### Como descrito, a variável tempo interage diretamente com as varáveis Consumo e Produção
+
+### OPCIONAL: Modelos foram criados usando este conjunto de dados? Discuta sobre os pontos fortes e as limitações do seu modelo.
+
+------
+
+# Gráficos Finais e Sumário
+
+### Primeiro Gráfico
+```{r echo=FALSE,fig.align='center', Plot_One}
+#UM SUBSET PARA CADA CONJUNTO
+#PAÍSES QUE NÃO SÃO MEMBROS DA OPEP
+not_opep  <- subset(merged,!is.na(merged$Consumption)&is.na(merged$Opep))
+#PAÍSES DA OPEP
+opep      <- subset(merged,!is.na(merged$Consumption)&!is.na(merged$Opep))
+#TODOS OS PAÍSES 
+mundo     <- subset(merged,!is.na(merged$Consumption))
+
+#CRIANDO UM GRÁFICO PARA CADA CENÁRIO 
+to_plot<-summarise(group_by(mundo,Year),Consumo=mean(Consumption),Producao=mean(Production))
+p1<- to_plot %>% 
+            gather(Leg,value, Producao, Consumo) %>%
+                ggplot(aes(x=Year, y=value, colour=Leg)) +
+                geom_line()+
+                ylab("Produção")+
+                xlab("")+
+                ggtitle('Mundo')
+
+to_plot <- summarise(group_by(opep ,Year),Consumo=mean(Consumption),Producao=mean(Production))
+p2<- to_plot %>%
+            gather(Leg,value, Producao, Consumo) %>%
+                ggplot(aes(x=Year, y=value, colour=Leg)) +
+                geom_line()+
+                ylab("")+
+                xlab("")+
+                theme(legend.position="bottom")+
+                ggtitle('OPEP')
+                
+to_plot <- summarise(group_by(not_opep,Year),Consumo=mean(Consumption),Producao=mean(Production))
+p3<- to_plot %>%
+            gather(Leg,value, Producao, Consumo) %>%
+                ggplot(aes(x=Year, y=value, colour=Leg)) +
+                geom_line()+
+                ylab("")+
+                xlab("")+
+                ggtitle('Não OPEP')
+
+#COMBINANDO OS GRÁFICOS EM UMA ÚNICA VISUALIZAÇÃO PARA SER POSSÍVEL A COMPARAÇÃO
+grid.arrange(p1 + theme(legend.position="none"),
+             p2,
+             p3 + theme(legend.position="none"),ncol=3)
+```
+
+### Descrição do Primeiro Gráfico
+
+#### Esse gráfico ilustra o Consumo e a Produção ao longo dos anos, fazendo a análise em 
+#### 3 grupos distintos: Os países que não são membros da OPEP, os membros da OPEP e todos os países 
+#### juntos. 
+#### Chama a atenção como a produção dos países da OPEP é bem maior que o seu respectivo consumo. 
+#### Fica claro também que é por conta dessa super-produção dos países da OPEP que não há falta de 
+#### Petróleo em nível mundial pois é evidente que isolando os países não membros da OPEP, os mesmos 
+#### têm consumo maior que as suas produções.
+
+### Segundo Gráfico
+```{r echo=FALSE,fig.align='center', Plot_Two}
+#OS CINCO MAIORES PRODUTORES DO MUNDO
+plot_top_prod <- subset(summarise(group_by(merged,country),
+               Consumo_Total=sum(Consumption),
+               Producao_Total=sum(Production)),Producao_Total > 50 & !is.na(Consumo_Total))
+
+plot_top_prod %>%
+    gather(LEG,value,Producao_Total, Consumo_Total) %>%
+    ggplot(aes(country,value, fill=LEG)) +
+    geom_bar(stat='identity',position='dodge')+
+    theme(legend.position="bottom")+
+    ylab("Produção Acumulada")+
+    xlab("Países")+
+    ggtitle("Maiores Produções Acumuladas")
+
+#OS CINCO MAIORES CONSUMIDORES DO MUNDO
+plot_top_cons <- subset(summarise(group_by(merged,country),
+               Consumo_Total=sum(Consumption),
+               Producao_Total=sum(Production)),Consumo_Total > 30 & !is.na(Consumo_Total))
+plot_top_cons %>%
+    gather(LEG,value, Producao_Total, Consumo_Total) %>%
+    ggplot(aes(x=country, y=value, fill=LEG)) +
+    geom_bar(stat='identity',position='dodge')+
+    theme(legend.position="bottom")+
+    ylab("Produção Acumulada")+
+    xlab("Países")+
+    ggtitle("Maiores Consumos Acumulados")
+```
+
+### Descrição do Segundo Gráfico
+
+#### Esses dois gráficos ilustram os maiores consumidos e maiores produtores em valores 
+#### acumulados ao longo dos anos.
+
+### Terceiro Gráfico
+```{r echo=FALSE,fig.align='center', Plot_Three}
+
+ds_summary <- summarise(group_by(subset(merged,!is.na(merged$Consumption)),Opep),
+               cons_total=sum(Consumption),
+               prod_total=sum(Production))
+
+ds_summary[is.na(ds_summary)] <- "Não Opep"
+
+pie_1<-ggplot(aes(x="",y=prod_total,fill=Opep),data=ds_summary)+
+       geom_bar(width=1,stat='identity')+
+       coord_polar("y")+
+       scale_fill_brewer(palette='RdYlBu') +
+       ylab("")+
+       xlab("")+
+       ggtitle("Produção")+
+       theme(axis.text.x=element_blank()) +
+       geom_text(aes(y = prod_total/2 + c(0, cumsum(prod_total)[-length(prod_total)]), 
+          label = percent(prod_total/sum(prod_total))), size=5)
+
+
+pie_2<-ggplot(aes(x="",y=cons_total,fill=Opep),data=ds_summary)+
+       geom_bar(width=1,stat='identity')+
+       coord_polar("y")+
+       scale_fill_brewer(palette='RdYlBu') +
+       ylab("")+
+       xlab("")+
+       ggtitle("Consumo")+
+       theme(legend.position="bottom")+
+       theme(axis.text.x=element_blank()) +
+       geom_text(aes(y = cons_total/2 + c(0, cumsum(cons_total)[-length(cons_total)]), 
+          label = percent(cons_total/sum(cons_total))), size=5)
+
+grid.arrange(pie_1 + theme(legend.position="none"),pie_2,ncol=2)
+
+```
+
+### Descrição do Terceiro Gráfico
+
+#### Ilustrando consumo e prodção em termos percentuais, separando por países membros ou não da OPEP.
+#### Destaque para o consumo elevadíssimo dos países que não são da OPEP.
+
+------
+
+# Reflexão
+
+#### A EDA explora como os aspectos geopolíticos e históricos influenciam o consumo e a produção de
+#### um dos principais comodities do mundo. A análise separou o grupo OPEP, que representa os países
+#### produtores de petróleo, e que temum comportamento singular em relação a produção.
+#### Foi possível indentificar países importadores líquidos e países exportadores líquidos, foi ainda 
+#### possível identificar e analisar quedas e crescimentos, causados por eventos específicos, como: O segundo 
+#### choque do petróleo, a exploração dos não convencionais nos Estados Unidos e o desenvolvimento 
+#### econômico da China.
